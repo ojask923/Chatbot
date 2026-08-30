@@ -33,25 +33,33 @@ Designed for effortless local execution with zero complex dependencies (no exter
 
 ---
 
-## 🚀 Quick Start (Windows)
+## 🚀 Quick Start
 
-### Option 1: Double-Click (Easiest)
-Simply double click [`run.bat`](run.bat). It will automatically create a `.venv`, install the dependencies, and open `http://localhost:8000` in your browser.
+### 1. Clone the Repository
 
-### Option 2: Command Line
+```bash
+git clone https://github.com/ojask923/Chatbot.git
+cd Chatbot
+```
+
+---
+
+### 2. Run the Application
+
+#### Option A: Double-Click (Windows - Easiest)
+Simply double click [`run.bat`](run.bat). It will automatically create a `.venv`, install all dependencies, and open `http://localhost:8000` in your browser.
+
+#### Option B: Command Line
 
 ```powershell
-# 1. Navigate to the project directory
-cd d:\Me\Lang\simple-chatbot
-
-# 2. (Optional) Create and activate virtual environment
+# 1. (Optional) Create and activate virtual environment
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
-# 3. Install requirements
+# 2. Install requirements
 pip install -r requirements.txt
 
-# 4. Start the server
+# 3. Start the server
 python start.py
 ```
 
