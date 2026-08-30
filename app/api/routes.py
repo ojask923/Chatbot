@@ -1,0 +1,258 @@
+"""FastAPI API routes for the simple chatbot with database persistence."""
+
+import json
+from typing import Optional, List
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
+
+from app.config import settings
+from app.agent.graph import agent
+from app.services.database import db_service
+from app.services.memory import memory_service
+
+
+router = APIRouter(prefix="/api")
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., description="User message text")
+    session_id: str = Field(default="default", description="Conversation session thread ID")
+    user_id: Optional[str] = Field(default="default_user", description="User identifier for long-term memory")
+    provider: Optional[str] = Field(default=None, description="LLM provider: groq, ollama, openai, gemini, anthropic")
+    model: Optional[str] = Field(default=None, description="Model identifier")
+    system_prompt: Optional[str] = Field(default=None, description="Custom system instructions")
+    temperature: Optional[float] = Field(default=0.7, ge=0.0, le=1.0)
+
+
+class ChatResponse(BaseModel):
+    content: str
+    session_id: str
+    provider: str
+    model: Optional[str] = None
+
+
+class SessionCreateRequest(BaseModel):
+    id: Optional[str] = None
+    title: Optional[str] = "New Chat"
+
+
+@router.get("/sessions")
+async def get_sessions():
+    """Retrieve all chat sessions from the database."""
+    sessions = db_service.get_all_sessions()
+    return [
+        {
+            "id": s.id,
+            "title": s.title,
+            "created_at": s.created_at.isoformat(),
+            "updated_at": s.updated_at.isoformat(),
+        }
+        for s in sessions
+    ]
+
+
+@router.post("/sessions")
+async def create_session(payload: SessionCreateRequest):
+    """Create a new chat session in the database."""
+    import uuid
+    session_id = payload.id or f"sess_{uuid.uuid4().hex[:8]}"
+    chat_session = db_service.create_session(session_id=session_id, title=payload.title or "New Chat")
+    return {
+        "id": chat_session.id,
+        "title": chat_session.title,
+        "created_at": chat_session.created_at.isoformat(),
+    }
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """Delete a chat session and its messages from the database."""
+    success = db_service.delete_session(session_id)
+    agent.clear_history(session_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"status": "deleted", "session_id": session_id}
+
+
+@router.post("/chat", response_model=ChatResponse)
+async def chat_endpoint(payload: ChatRequest):
+    """Non-streaming chat endpoint with database persistence."""
+    try:
+        # Save user message to database
+        db_service.add_message(payload.session_id, role="user", content=payload.message)
+
+        res = await agent.get_response(
+            message=payload.message,
+            session_id=payload.session_id,
+            user_id=payload.user_id or "default_user",
+            provider=payload.provider or settings.DEFAULT_PROVIDER,
+            model=payload.model or settings.DEFAULT_MODEL,
+            system_prompt=payload.system_prompt,
+            temperature=payload.temperature or settings.TEMPERATURE,
+        )
+
+        # Save assistant response to database
+        db_service.add_message(payload.session_id, role="assistant", content=res["content"])
+
+        return ChatResponse(**res)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/chat/stream")
+async def chat_stream_endpoint(payload: ChatRequest):
+    """Server-Sent Events (SSE) streaming endpoint with database persistence."""
+    # Record user message in DB
+    db_service.add_message(payload.session_id, role="user", content=payload.message)
+
+    async def event_generator():
+        accumulated_response = ""
+        last_tool = None
+        try:
+            async for event in agent.stream_response(
+                message=payload.message,
+                session_id=payload.session_id,
+                user_id=payload.user_id or "default_user",
+                provider=payload.provider or settings.DEFAULT_PROVIDER,
+                model=payload.model or settings.DEFAULT_MODEL,
+                system_prompt=payload.system_prompt,
+                temperature=payload.temperature or settings.TEMPERATURE,
+            ):
+                if event.get("type") == "token":
+                    accumulated_response += event.get("content", "")
+                elif event.get("type") == "tool_start":
+                    last_tool = event.get("name")
+
+                yield f"data: {json.dumps(event)}\n\n"
+
+            # Save full assistant response to database on completion
+            if accumulated_response:
+                db_service.add_message(
+                    payload.session_id,
+                    role="assistant",
+                    content=accumulated_response,
+                    tool_name=last_tool,
+                )
+
+        except Exception as e:
+            err_data = {"type": "error", "content": str(e)}
+            yield f"data: {json.dumps(err_data)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get("/memories/{user_id}")
+async def get_user_memories(user_id: str):
+    """Get all long-term memory facts stored for a user."""
+    memories = await memory_service.get_all(user_id)
+    return {"user_id": user_id, "memories": memories}
+
+
+@router.delete("/memories/{user_id}/{memory_id}")
+async def delete_user_memory(user_id: str, memory_id: int):
+    """Delete a specific long-term memory fact."""
+    success = await memory_service.delete(user_id, memory_id)
+    return {"status": "deleted" if success else "not_found", "memory_id": memory_id}
+
+
+@router.delete("/memories/{user_id}")
+async def clear_user_memories(user_id: str):
+    """Clear all long-term memories for a user."""
+    await memory_service.clear_all(user_id)
+    return {"status": "cleared", "user_id": user_id}
+
+
+@router.get("/models")
+async def get_models():
+    """Return available providers and models."""
+    return {
+        "current_default_provider": settings.DEFAULT_PROVIDER,
+        "current_default_model": settings.DEFAULT_MODEL,
+        "providers": {
+            "groq": {
+                "name": "Groq (Ultra-Fast)",
+                "description": "GPT-OSS 120B / Qwen 3.8 / 3.6 / GPT-OSS 20B",
+                "models": ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "qwen/qwen3.6-27b", "openai/gpt-oss-20b"],
+                "requires_key": True,
+                "is_configured": bool(settings.GROQ_API_KEY),
+            },
+            "ollama": {
+                "name": "Ollama (Local LLM)",
+                "description": "100% free local models running on your computer",
+                "models": ["llama3.2", "mistral", "deepseek-r1:latest", "qwen2.5", "phi3"],
+                "requires_key": False,
+                "is_configured": True,
+                "base_url": settings.OLLAMA_BASE_URL,
+            },
+            "openai": {
+                "name": "OpenAI",
+                "description": "GPT-4o, GPT-4o-mini",
+                "models": ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"],
+                "requires_key": True,
+                "is_configured": bool(settings.OPENAI_API_KEY),
+            },
+            "gemini": {
+                "name": "Google Gemini",
+                "description": "Gemini 1.5 Flash, Gemini 1.5 Pro, Gemini 2.0 Flash",
+                "models": ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"],
+                "requires_key": True,
+                "is_configured": bool(settings.GEMINI_API_KEY),
+            },
+            "anthropic": {
+                "name": "Anthropic Claude",
+                "description": "Claude 3.5 Sonnet, Claude 3.5 Haiku",
+                "models": ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
+                "requires_key": True,
+                "is_configured": bool(settings.ANTHROPIC_API_KEY),
+            },
+        },
+    }
+
+
+@router.get("/history/{session_id}")
+async def get_session_history(session_id: str):
+    """Get conversation history from the database for a session."""
+    messages = db_service.get_session_messages(session_id)
+    return {
+        "session_id": session_id,
+        "messages": [
+            {
+                "id": m.id,
+                "role": m.role,
+                "content": m.content,
+                "tool_name": m.tool_name,
+                "created_at": m.created_at.isoformat(),
+            }
+            for m in messages
+        ],
+    }
+
+
+@router.delete("/history/{session_id}")
+async def clear_session_history(session_id: str):
+    """Clear message history in the database for a session."""
+    db_service.clear_session_messages(session_id)
+    agent.clear_history(session_id)
+    return {"status": "cleared", "session_id": session_id}
+
+
+@router.get("/health")
+async def health_check():
+    """Health check endpoint checking API and database connectivity."""
+    db_healthy = db_service.health_check()
+    return {
+        "status": "healthy" if db_healthy else "degraded",
+        "app": settings.APP_NAME,
+        "version": settings.VERSION,
+        "database": "healthy" if db_healthy else "unhealthy",
+        "tools_enabled": settings.ENABLE_TOOLS,
+    }

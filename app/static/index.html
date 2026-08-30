@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local AI Chatbot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <!-- Highlight.js for syntax highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <!-- Marked for markdown parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <div class="logo-icon">⚡</div>
+          <div class="logo-text">
+            <span class="logo-title">LocalAgent</span>
+            <span class="logo-badge">v1.0</span>
+          </div>
+        </div>
+        <button id="new-chat-btn" class="btn btn-primary new-chat-btn" title="Start a new chat">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+          <span>New Chat</span>
+        </button>
+      </div>
+
+      <div class="sessions-section">
+        <div class="section-label">Conversations</div>
+        <div class="sessions-list" id="sessions-list">
+          <!-- Session items inserted by JS -->
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button id="open-memories-btn" class="footer-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7zM9 21h6"/></svg>
+          <span>Long-Term Memory</span>
+        </button>
+        <button id="open-settings-btn" class="footer-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Model Settings</span>
+        </button>
+        <button id="theme-toggle-btn" class="footer-btn" title="Toggle Light/Dark Theme">
+          <span id="theme-icon">🌙</span>
+          <span id="theme-text">Dark Mode</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Chat Window -->
+    <main class="chat-main">
+      <!-- Top Navigation Bar -->
+      <header class="chat-header">
+        <div class="header-left">
+          <button id="toggle-sidebar-btn" class="icon-btn mobile-only" title="Toggle Sidebar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <div class="active-model-pill" id="active-model-pill" title="Click to change model">
+            <span class="status-indicator"></span>
+            <span id="header-provider-name">Groq</span>
+            <span class="pill-divider">/</span>
+            <span id="header-model-name">openai/gpt-oss-120b</span>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <button id="export-chat-btn" class="icon-btn" title="Export conversation">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
+          <button id="clear-chat-btn" class="icon-btn" title="Clear current messages">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Message History Container -->
+      <div class="chat-messages-container" id="chat-messages">
+        <!-- Hero / Welcome Greeting -->
+        <div class="welcome-hero" id="welcome-hero">
+          <div class="hero-icon-wrapper">
+            <span class="hero-icon">✨</span>
+          </div>
+          <h2>What would you like to build or explore?</h2>
+          <p class="hero-subtitle">Running locally with FastAPI, LangGraph, SQLModel database, and Long-Term Memory.</p>
+
+          <div class="suggestion-grid">
+            <button class="suggestion-chip" data-prompt="My name is Alex and I love building Python apps. Remember this.">
+              <span class="chip-icon">🧠</span>
+              <span class="chip-text">Test Long-Term Memory (Tell it a fact)</span>
+            </button>
+            <button class="suggestion-chip" data-prompt="What is my name and what do I like?">
+              <span class="chip-icon">🔍</span>
+              <span class="chip-text">Ask what it remembers about you</span>
+            </button>
+            <button class="suggestion-chip" data-prompt="Calculate sqrt(144) * 25 + 50">
+              <span class="chip-icon">🧮</span>
+              <span class="chip-text">Evaluate a math calculation (Tool)</span>
+            </button>
+            <button class="suggestion-chip" data-prompt="Write a Python script to monitor website uptime and log response status">
+              <span class="chip-icon">💻</span>
+              <span class="chip-text">Generate a Python script</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat Input Area -->
+      <div class="chat-input-wrapper">
+        <form class="chat-form" id="chat-form">
+          <div class="input-container">
+            <textarea
+              id="user-input"
+              placeholder="Ask anything or request a task... (Press Enter to send, Shift+Enter for new line)"
+              rows="1"
+              autofocus
+            ></textarea>
+            <div class="input-actions">
+              <button type="button" id="voice-input-btn" class="input-action-btn" title="Voice Input">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </button>
+              <button type="submit" id="send-btn" class="send-btn" title="Send message">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+          </div>
+        </form>
+        <div class="input-footer-note">
+          Supports streaming responses, SQL database persistence & Mem0 long-term memory.
+        </div>
+      </div>
+    </main>
+
+    <!-- Settings Modal Drawer -->
+    <div class="modal-overlay" id="settings-modal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Model & Agent Settings</h3>
+          <button id="close-settings-btn" class="icon-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="provider-select">LLM Provider</label>
+            <select id="provider-select" class="form-control">
+              <option value="groq">Groq (Ultra-Fast Cloud)</option>
+              <option value="ollama">Ollama (100% Free Local LLM)</option>
+              <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
+              <option value="gemini">Google Gemini (1.5 Flash / 2.0)</option>
+              <option value="anthropic">Anthropic (Claude 3.5)</option>
+            </select>
+            <small class="help-text" id="provider-desc">Groq ultra-fast AI acceleration.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="model-input">Model Name</label>
+            <input type="text" id="model-input" class="form-control" value="openai/gpt-oss-120b" placeholder="e.g. openai/gpt-oss-120b, llama3.2">
+          </div>
+
+          <div class="form-group">
+            <div class="slider-label-row">
+              <label for="temp-slider">Temperature</label>
+              <span id="temp-val" class="slider-val">0.7</span>
+            </div>
+            <input type="range" id="temp-slider" min="0" max="1" step="0.05" value="0.7" class="slider-control">
+          </div>
+
+          <div class="form-group">
+            <label for="system-prompt">System Prompt</label>
+            <textarea id="system-prompt" class="form-control" rows="3" placeholder="You are a helpful, precise, and friendly AI assistant."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="save-settings-btn" class="btn btn-primary">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Long-Term Memories Modal Drawer -->
+    <div class="modal-overlay" id="memories-modal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>🧠 Long-Term Memory (Mem0)</h3>
+          <button id="close-memories-btn" class="icon-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="help-text" style="margin-bottom: 12px;">Facts, preferences, and details the AI has automatically learned about you across all past conversations:</p>
+          <div id="memories-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto;">
+            <!-- Memory cards inserted by JS -->
+          </div>
+        </div>
+        <div class="modal-footer" style="justify-content: space-between;">
+          <button id="clear-all-memories-btn" class="btn" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">Clear All Memories</button>
+          <button id="close-memories-done-btn" class="btn btn-primary">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
