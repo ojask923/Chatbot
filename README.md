@@ -41,9 +41,8 @@ Simply double click [`run.bat`](run.bat). It will automatically create a `.venv`
 ### Option 2: Command Line
 
 ```powershell
-# 1. Clone or navigate to the project directory
-git clone https://github.com/ojask923/Chatbot.git
-cd Chatbot
+# 1. Navigate to the project directory
+cd d:\Me\Lang\simple-chatbot
 
 # 2. (Optional) Create and activate virtual environment
 python -m venv .venv
@@ -90,6 +89,7 @@ DATABASE_URL=sqlite:///./chatbot.db
 ## 📁 Project Structure
 
 ```text
+simple-chatbot/
 ├── app/
 │   ├── agent/
 │   │   ├── graph.py       # LangGraph state machine & multi-provider factory
