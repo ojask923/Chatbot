@@ -89,7 +89,7 @@ DATABASE_URL=sqlite:///./chatbot.db
 ## 📁 Project Structure
 
 ```text
-simple-chatbot/
+├── alembic/               # Database migrations
 ├── app/
 │   ├── agent/
 │   │   ├── graph.py       # LangGraph state machine & multi-provider factory
@@ -100,12 +100,14 @@ simple-chatbot/
 │   │   ├── session.py     # ChatSession table
 │   │   └── message.py     # ChatMessage table
 │   ├── services/          # Services Layer
-│   │   └── database.py    # Database connection & CRUD operations
+│   │   ├── database.py    # Database connection & CRUD operations
+│   │   └── memory.py      # Mem0 user preferences & long-term memory
 │   ├── static/            # Modern Web Chat UI
 │   │   ├── index.html     # HTML Layout
 │   │   ├── style.css      # Glassmorphism styling & animations
 │   │   └── app.js         # SSE streaming & database-synced session manager
 │   └── config.py          # Pydantic environment configuration
+├── alembic.ini            # Alembic configuration
 ├── chatbot.db             # Local SQLite database file (auto-generated)
 ├── main.py                # FastAPI app initialization & database lifespan
 ├── start.py               # Launcher script with auto browser popup
@@ -113,3 +115,4 @@ simple-chatbot/
 ├── requirements.txt       # Dependencies
 └── .env                   # Environment config
 ```
+
