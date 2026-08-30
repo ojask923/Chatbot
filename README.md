@@ -41,8 +41,9 @@ Simply double click [`run.bat`](run.bat). It will automatically create a `.venv`
 ### Option 2: Command Line
 
 ```powershell
-# 1. Navigate to the project directory
-cd d:\Me\Lang\simple-chatbot
+# 1. Clone or navigate to the project directory
+git clone https://github.com/ojask923/Chatbot.git
+cd Chatbot
 
 # 2. (Optional) Create and activate virtual environment
 python -m venv .venv
@@ -89,7 +90,9 @@ DATABASE_URL=sqlite:///./chatbot.db
 ## 📁 Project Structure
 
 ```text
-simple-chatbot/
+├── alembic/               # Database migration scripts & configuration
+│   ├── versions/          # Migration version files
+│   └── env.py
 ├── app/
 │   ├── agent/
 │   │   ├── graph.py       # LangGraph state machine & multi-provider factory
@@ -106,6 +109,7 @@ simple-chatbot/
 │   │   ├── style.css      # Glassmorphism styling & animations
 │   │   └── app.js         # SSE streaming & database-synced session manager
 │   └── config.py          # Pydantic environment configuration
+├── alembic.ini            # Alembic configuration
 ├── chatbot.db             # Local SQLite database file (auto-generated)
 ├── main.py                # FastAPI app initialization & database lifespan
 ├── start.py               # Launcher script with auto browser popup
