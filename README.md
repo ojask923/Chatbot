@@ -1,4 +1,4 @@
-# ⚡ Simple Local Chatbot
+# ⚡ Fastapi Langgraph Chatbot
 
 A clean, modern, and lightweight local chatbot built with **FastAPI** and **LangGraph**.
 
