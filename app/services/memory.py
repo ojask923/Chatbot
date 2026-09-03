@@ -65,7 +65,7 @@ class MemoryService:
                         "config": {"model": "text-embedding-3-small", "api_key": settings.OPENAI_API_KEY},
                     },
                 }
-                self._mem0_instance = await AsyncMemory.from_config(config)
+                self._mem0_instance = AsyncMemory.from_config(config)
                 self._use_mem0 = True
                 print("[INFO] mem0 with pgvector initialized for long-term memory!")
             except Exception as e:
